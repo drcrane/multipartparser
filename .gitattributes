@@ -3,4 +3,6 @@
 *.cpp text
 *.hpp text
 
-*.eml auto eol=crlf
+#*.eml auto eol=crlf
+*.eml binary
+

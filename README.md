@@ -21,6 +21,7 @@ above and then run the following:
 
     ./main test/test1.eml
     ./main test/test2.eml
+    testsrc/testheaders testdata/test3.eml
 
 # Bugs and Problems
 

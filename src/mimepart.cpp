@@ -12,28 +12,10 @@ k7nb1Y1lKUpFJJEKRBugqZYgo4Aq6Lc+mBS+SB1pcrHcpFHPQ/lULQOx5JrR
 
 MIMEPart::MIMEPart(char * startAt, long size) {
 	this->headerStart = startAt;
-	this->parent = NULL;
 	this->totalSize = size;
-	tokenisedHeaders = NULL;
-	this->useParentBoundary = false;
-}
-
-MIMEPart::MIMEPart(MIMEPart *parent, char * startAt, long size) {
-	this->headerStart = startAt;
-	this->parent = parent;
-	this->totalSize = size;
-	tokenisedHeaders = NULL;
-	headers = NULL;
-	this->useParentBoundary = true;
 }
 
 MIMEPart::~MIMEPart() {
-	if (headers != NULL) {
-		delete headers;
-	}
-	if (tokenisedHeaders != NULL) {
-		delete tokenisedHeaders;
-	}
 }
 
 static char *skip_whitespace(char * s) {
@@ -71,6 +53,7 @@ int MIMEPart::Parse() {
 }
 
 int MIMEPart::ParseHeader() {
+	struct header currheader;
 	int pos = 0;
 	int i;
 	char *start;
@@ -79,9 +62,7 @@ int MIMEPart::ParseHeader() {
 	char *header = headerStart;
 	int currenthdr = 0;
 	
-	/* using an STL C++ map to link the headername with the headervalue */
-	std::map<char*, char *, strCmp> *headers = new std::map<char*, char *, strCmp>;
-	this->headers = headers;
+	currheader.parsed = NULL;
 	i = 0;
 	/* Find the start of the header attribute */
 	while ( !((header[i] >= 'a' && header[i] <= 'z') || (header[i] >= 'A' && header[i] <= 'Z')) && header[i] != '\0')  {
@@ -97,7 +78,9 @@ startagain:
 		*(val_end - 2) = '\0';
 	}
 	*(val_end - 1) = '\0';
-	(*headers)[start] = value;
+	currheader.attr = start;
+	currheader.value = value;
+	headers.push_back(currheader);
 	currenthdr++;
 	if (*val_end != '\0' && *val_end != '\r' && *val_end != '\n') {
 		start = val_end;
@@ -110,162 +93,52 @@ startagain:
 		/* header ends at val_end + 1 */
 		headerEnd = val_end + 1;
 	}
-	this->noHeaders = currenthdr;
-	contentBegin = headerEnd;
+	//this->noHeaders = currenthdr;
+	//contentBegin = headerEnd;
 	return currenthdr;
 }
 
-char *MIMEPart::GetHeader(char * header) {
-	int i;
-	return (*headers)[header];
-}
-
-int MIMEPart::GetHeaderPos(char * header) {
-	int i;
-}
-
-char *MIMEPart::GetHeaderAttr(char * header, char * attr) {
-	if ((*tokenisedHeaders)[header] == NULL) {
-		return NULL;
-	}
-	return (*(*tokenisedHeaders)[header])[attr];
-}
-
-char * MIMEPart::GetBoundary() {
-	return boundary;
-}
-
-int MIMEPart::IsMultipart() {
-	if (tokenisedHeaders == NULL) {
-		return -1;
-	}
-	if ((*tokenisedHeaders)["Content-type"] == NULL) {
-		/* ParseHeaders() and Tokenise("Content-Type") should be called first */
-		return -1;
-	}
-	std::map<char*, char*, strCmp> * h;
-	std::map<char*, char*, strCmp>::iterator it;
-	h = (*tokenisedHeaders)["Content-type"];
-	
-	/*
-	for ( it=(*h).begin() ; it != (*h).end(); it++ )
-		fprintf(stdout, "%s = %s\n", (*it).first, (*it).second);
-	*/
-	if ((*h)["multipart/alternative"] != NULL || (*h)["multipart/mixed"] != NULL) {
-		return 1;
+int MIMEPart::IterateHeaders() {
+	std::vector<struct header>::iterator it;
+	for (it = headers.begin(); it < headers.end(); it++) {
+		fprintf(stdout, "H: %s\n", (*it).attr);
 	}
 	return 0;
 }
 
-int MIMEPart::FindSectionEnd() {
-	char * tmp, * offs;
-	char * boundary;
-	int d;
-	
-	if (parent != NULL && useParentBoundary) {
-		tmp = parent->GetBoundary();
-	} else {
-		tmp = this->GetHeaderAttr("Content-type", "boundary");
+char * MIMEPart::GetHeader(const char * attribute, int idx) {
+	std::vector<struct header>::iterator it;
+	for (it = headers.begin(); it < headers.end(); it++) {
+		if (strcasecmp((*it).attr, attribute) == 0) {
+			return (*it).value;
+		}
 	}
-	//fprintf (stdout, "Boundary: %s\n", tmp);
-	this->boundary = tmp;
-	d = strlen(tmp);
-	boundary = (char *)malloc(d+13);
-	strcpy (boundary, "--");
-	strcat (boundary, tmp);
-	tmp = headerEnd;
-retry:
-	offs = strstr (tmp, boundary);
-	if (offs == NULL) {
-		free(boundary);
-		return -1;
-	}
-	if (*(offs - 1) != '\r' && *(offs - 1) != '\n') {
-		tmp = offs + d;
-		goto retry;
-	}
-	free(boundary);
-	contentEnd = offs;
-	sectionEnd = offs + d + 2;
-	if (*sectionEnd == '\r' && *(sectionEnd + 1) == '\n') {
-		sectionEnd ++;
-	}
-	sectionEnd ++;
-	sectionSize = contentEnd - headerEnd;
-	if (*sectionEnd == '-' && *(sectionEnd - 1) == '-') {
-		this->moreSections = false;
-	} else {
-		this->moreSections = true;
-	}
-	return 0;
-}
-
-char *MIMEPart::GetSectionEnd() {
-	return sectionEnd;
-}
-
-MIMEPart *MIMEPart::GetNextSection() {
-	//
-}
-
-bool MIMEPart::MoreSections() {
-	return this->moreSections;
-}
-
-long MIMEPart::GetSectionSize() {
-	return this->sectionSize;
-}
-
-char *MIMEPart::GetContent() {
-	return headerEnd;
+	return NULL;
 }
 
 /*
-    These functions take a header string and tokenise it so that it becomes a set of <attr,value> pairs.
-    Often the first value does not have an attribute and so the first element is: attr=null val="value",
-    an example is the Content-type header that often looks like this:
-    "Content-type: multipart/alternative; charset=UTF8; boundary="crazy99silly762112"\r\n".
-    These functions corrupt the buffer and so the buffer must be r/w and not required after tokenisation.
+    Perform in-place tokenisation, this means that the char buffer
+    given to this function will be mutated.
 */
-int MIMEPart::Tokenise (char * headerStr) {
-	char *attr = NULL, *value = NULL, *next = NULL;
-	char *hdrContent;
-	int i = 0;
-	std::map<char *, char *, strCmp> *thisHeader = new std::map<char *, char *, strCmp>;
-	
-	hdrContent = (*headers)[headerStr];
-	if (hdrContent == NULL) {
-		return -1;
-	}
-	this->UtilTokenise(hdrContent, &attr, &value, &next);
-	//fprintf (stdout, "%s.%s = %s\n", headerStr, attr, value);
-	(*thisHeader)[attr] = value;
-	while (this->UtilTokenise(next, &attr, &value, &next) == 0) {
-		(*thisHeader)[attr] = value;
-		//fprintf (stdout, "%s.%s = %s\n", headerStr, attr, value);
-	}
-	if (tokenisedHeaders == NULL) {
-		tokenisedHeaders = new std::map<char *, std::map<char *, char *, strCmp> *, strCmp>;
-	}
-	(*tokenisedHeaders)[headerStr] = thisHeader;
-	/* we screwed this value up :-( */
-	/* but don't worry, all screwed up values can be re-constituted. */
-	(*headers).erase(headerStr);
-	return i;
-}
-
-int MIMEPart::UtilTokenise (char * line, char **attr, char **value, char **nextToken) {
-	char *tokenStart;
-	char *tokenEnd;
+std::vector<struct MIMEPart::attrval> * MIMEPart::TokeniseHeader(char * line) {
+	char *tokenStart, *tokenEnd, *nextToken = NULL;
 	char *eqPos, *coPos, *co2Pos;
-	
-	if (*line == '\0') {
-		return -1;
+	std::vector<struct attrval> * tokList;
+	struct attrval av;
+	nextToken = line;
+	tokList = new std::vector<struct attrval>();
+tryAgain:
+	if (*nextToken == '\0') {
+		goto finished;
 	}
-	if (*line == ';' || *line == ',') {
-		line ++;
+	//if (*nextToken == '\r' || *nextToken == '\n') {
+	//	fprintf(stderr, "We got a line terminator\n");
+	//	goto finished;
+	//}
+	if (*nextToken == ';' || *nextToken == ',') {
+		nextToken++;
 	}
-	tokenStart = skip_allwhitespace(line);
+	tokenStart = skip_allwhitespace(nextToken);
 	eqPos = strchr(tokenStart, '=');
 	coPos = strchr(tokenStart, ';');
 	co2Pos = strchr(tokenStart, ',');
@@ -277,40 +150,114 @@ int MIMEPart::UtilTokenise (char * line, char **attr, char **value, char **nextT
 	}
 	if (coPos != NULL && eqPos != NULL && coPos < eqPos) {
 		*coPos = '\0';
-		*value = tokenStart;
-		*attr = tokenStart;
-		*nextToken = coPos + 1;
+		av.value = tokenStart;
+		av.attr = tokenStart;
+		nextToken = coPos + 1;
 		if (strlen(tokenStart) == 0) {
-			return -1;
+			
+			goto finished;
 		}
 	} else {
 		tokenEnd = strchr (tokenStart, '=');
-		//fprintf (stdout, "[%s]\n", tokenEnd);
+		if (tokenEnd == NULL) {
+			// The token does not exist from tokenStart...
+			// This is probably malformed, ABORT!
+			goto finished;
+		}
 		*tokenEnd = '\0';
 		if (*(tokenEnd + 1) == '\"') {
 			tokenEnd += 2;
-			*value = tokenEnd;
+			av.value = tokenEnd;
 			while (*tokenEnd != '\"' && *tokenEnd != '\0') {
-				if (*tokenEnd == '\\')
+				if (*tokenEnd == '\\') {
 					tokenEnd ++;
-				tokenEnd ++;
+				}
+				tokenEnd++;
 			}
 			if (*tokenEnd == '\"') {
 				*tokenEnd = '\0';
 			}
-			*nextToken = tokenEnd + 1;
-			*attr = tokenStart;
+			nextToken = tokenEnd + 1;
+			av.attr = tokenStart;
 		} else {
 			tokenEnd++;
-			*value = tokenEnd;
+			av.value = tokenEnd;
 			while (*tokenEnd != '\r' && *tokenEnd != '\n' && *tokenEnd != '\t' && *tokenEnd != ' ' && *tokenEnd != ';' && *tokenEnd != ',' && *tokenEnd != '\0') {
-				tokenEnd++;
+				tokenEnd ++;
 			}
 			*tokenEnd = '\0';
-			*attr = tokenStart;
-			*nextToken = tokenEnd + 1;
+			av.attr = tokenStart;
+			nextToken = tokenEnd + 1;
 		}
 	}
+	fprintf(stderr, "[%s]\n", av.attr);
+	tokList->push_back(av);
+	goto tryAgain;
+finished:
+	return tokList;
+}
+
+char * MIMEPart::GetAttributeByName(const char * attr, std::vector<struct MIMEPart::attrval> * attrval_vect) {
+	std::vector<struct MIMEPart::attrval>::iterator it;
+	for (it = attrval_vect->begin(); it < attrval_vect->end(); it++) {
+		char * curr_attr = (*it).attr;
+		if (curr_attr != NULL && strcmp(attr, curr_attr) == 0) {
+			return (*it).value;
+		}
+	}
+	return NULL;
+}
+
+int MIMEPart::FindSectionEnd() {
+	char * tmp, * offs;
+	char * boundary;
+	int d;
+	std::vector<struct MIMEPart::attrval> * attrval_vect;
+	int sectioncount = 0;
+	int sectionsize;
+
+	tmp = this->GetHeader("Content-type", 0);
+	attrval_vect = this->TokeniseHeader(tmp);
+	tmp = this->GetAttributeByName("boundary", attrval_vect);
+	if (tmp == NULL) {
+		return -1;
+	}
+	d = strlen(tmp);
+	boundary = (char *)malloc(d+13);
+	strcpy (boundary, "--");
+	strcat (boundary, tmp);
+	d += 2;
+
+	fprintf(stdout, "the section end is %s\n", boundary);
+
+	tmp = headerEnd;
+retry:
+	offs = strstr (tmp, boundary);
+	if (offs == NULL) {
+		free(boundary);
+		return -1;
+	}
+	// The boundary must start after a new line, if not then it is not a boundary.
+	if (*(offs - 1) != '\r' && *(offs - 1) != '\n') {
+		tmp = offs + d;
+		goto retry;
+	}
+
+	if (offs[d] == '-' && offs[d+1] == '-') {
+		// This is the end of the section.
+		sectionsize = offs - tmp;
+		fprintf(stdout, "last Section %d size %d\n", sectioncount, sectionsize);
+	} else {
+		sectionsize = offs - tmp;
+		fprintf(stdout, "Section %d size %d\n", sectioncount, sectionsize);
+		sectioncount ++;
+		tmp = offs + d;
+		goto retry;
+	}
+	offs[d + 10] = '\0';
+	fprintf(stdout, "%s\n", offs);
+
+	fprintf(stdout, "number of sections: %d\n", sectioncount);
 	return 0;
 }
 
