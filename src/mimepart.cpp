@@ -218,12 +218,12 @@ int MIMEPart::FindSectionEnd() {
 
 	tmp = this->GetHeader("Content-type", 0);
 	if (tmp == NULL) {
-		return -1;
+		goto no_headers;
 	}
 	attrval_vect = this->TokeniseHeader(tmp);
 	tmp = this->GetAttributeByName("boundary", attrval_vect);
 	if (tmp == NULL) {
-		return -1;
+		goto no_headers;
 	}
 	d = strlen(tmp);
 	boundary = (char *)malloc(d+13);
@@ -261,6 +261,16 @@ retry:
 	fprintf(stdout, "%s\n", offs);
 
 	fprintf(stdout, "number of sections: %d\n", sectioncount);
+	return 0;
+
+no_headers:
+	// if the required headers are not present then the section end
+	// is the end of the email... the end of the file.
+	sectionsize = strlen(headerEnd);
+	sectioncount = 1;
+	fprintf(stdout, "number of sections: %d\n", sectioncount);
+	fprintf(stdout, "size of this section is: %d\n", sectionsize);
+	fprintf(stdout, "[%s]\n", headerEnd);
 	return 0;
 }
 
