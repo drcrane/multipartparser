@@ -217,6 +217,9 @@ int MIMEPart::FindSectionEnd() {
 	int sectionsize;
 
 	tmp = this->GetHeader("Content-type", 0);
+	if (tmp == NULL) {
+		return -1;
+	}
 	attrval_vect = this->TokeniseHeader(tmp);
 	tmp = this->GetAttributeByName("boundary", attrval_vect);
 	if (tmp == NULL) {

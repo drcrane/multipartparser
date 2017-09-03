@@ -76,9 +76,11 @@ int main(int argc, char *argv[]) {
 		for (it = contenttype->begin(); it < contenttype->end(); it++) {
 			fprintf(stdout, "%s is %s\n", (*it).attr, (*it).value);
 		}
+	} else {
+		fprintf(stdout, "There is no DomainKey-Signature header in this email.\n");
 	}
 
-	part->FindSectionEnd();
+	res = part->FindSectionEnd();
 
 	if (res != 0) {
 		fprintf (stdout, "Parse failed!\n");
