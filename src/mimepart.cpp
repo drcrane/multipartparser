@@ -64,6 +64,8 @@ int MIMEPart::ParseHeader() {
 	
 	currheader.parsed = NULL;
 	i = 0;
+	/* determine if this part has headers... we are looking for \r\n\r\n or \n\n */
+	
 	/* Find the start of the header attribute */
 	while ( !((header[i] >= 'a' && header[i] <= 'z') || (header[i] >= 'A' && header[i] <= 'Z')) && header[i] != '\0')  {
 		i++;
@@ -93,8 +95,6 @@ startagain:
 		/* header ends at val_end + 1 */
 		headerEnd = val_end + 1;
 	}
-	//this->noHeaders = currenthdr;
-	//contentBegin = headerEnd;
 	return currenthdr;
 }
 
@@ -250,6 +250,7 @@ retry:
 		// This is the end of the section.
 		sectionsize = offs - tmp;
 		fprintf(stdout, "last Section %d size %d\n", sectioncount, sectionsize);
+		sectioncount ++;
 	} else {
 		sectionsize = offs - tmp;
 		fprintf(stdout, "Section %d size %d\n", sectioncount, sectionsize);
@@ -257,8 +258,8 @@ retry:
 		tmp = offs + d;
 		goto retry;
 	}
-	offs[d + 10] = '\0';
-	fprintf(stdout, "%s\n", offs);
+	offs[d + 2] = '\0';
+	fprintf(stdout, "section:[%s]\n", offs);
 
 	fprintf(stdout, "number of sections: %d\n", sectioncount);
 	return 0;

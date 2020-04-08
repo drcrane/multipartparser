@@ -7,6 +7,22 @@
 #define NUM_HEADERS 20
 #define NUM_DECODED 20
 
+class MIMEHeader {
+public:
+	struct attrval {
+		char * attr;
+		char * value;
+	};
+	MIMEHeader(char * attribute, char * value);
+	MIMEHeader(char * attribute, std::vector<struct attrval> * attrval);
+	~MIMEHeader();
+	bool canParse();
+private:
+	char * attr;
+	char * value;
+	std::vector<struct attrval> * attrval;
+};
+
 class MIMEPart {
 public:
 	struct header {

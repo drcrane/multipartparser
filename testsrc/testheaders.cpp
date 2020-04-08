@@ -55,6 +55,8 @@ int main(int argc, char *argv[]) {
 	fprintf (stdout, "Read %d bytes of email file\n", emailsize);
 	
 	part = new MIMEPart(emailbuffer, emailsize);
+	//
+
 	res = part->ParseHeader();
 	subject = part->GetHeader("Subject", 0);
 	fprintf(stdout, "Subject: %s\n", subject);
